@@ -360,24 +360,7 @@ const handleSubmit = async (e) => {
                 exit={{ opacity: 0, height: 0 }}
                 className="space-y-2"
               >
-                <label className="text-sm font-medium text-gray-200">Username</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => {
-                      setUsername(e.target.value);
-                      validateField('username', e.target.value);
-                    }}
-                    className="w-full pl-10 pr-4 py-4 rounded-xl border border-white/20 focus:border-purple-400 focus:ring-4 focus:ring-purple-500/20 transition-all duration-300 bg-white/10 backdrop-blur-sm text-white placeholder-gray-400"
-                    placeholder="Choose a username"
-                    required={!isLogin}
-                  />
-                  {errors.username && (
-                    <p className="text-red-400 text-sm mt-1">{errors.username}</p>
-                  )}
-                </div>
+                {/* Username input removed to avoid duplication with the shared identifier/username field below */}
               </motion.div>
             )}
 
@@ -442,35 +425,7 @@ const handleSubmit = async (e) => {
                   Password must contain: 8+ characters, uppercase, lowercase, number, special character
                 </div>
               )}  
-              {!isLogin && (
-                <div className="mt-4">
-                  <p className="text-gray-300 mb-2">Face Capture (Required)</p>
-
-                  {!faceImage ? (
-                    <>
-                      <Webcam
-                        ref={webcamRef}
-                        screenshotFormat="image/jpeg"
-                        className="rounded-xl"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const img = webcamRef.current.getScreenshot();
-                          setFaceImage(img);
-                        }}
-                        className="mt-2 bg-purple-500 px-4 py-2 rounded-lg"
-                      >
-                        Capture Face
-                      </button>
-                    </>
-                  ) : (
-                    <img src={faceImage} className="rounded-xl" />
-                  )}
-                </div>
-              )}
-
+               
             </div>
 
             <motion.button

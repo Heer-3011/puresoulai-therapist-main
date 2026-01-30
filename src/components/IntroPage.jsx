@@ -29,13 +29,7 @@ const IntroPage = () => {
       title: 'Compassionate Support',
       description: '24/7 empathetic AI companion ready to listen and help',
       color: 'from-blue-500 to-cyan-500',
-    },
-    {
-      icon: Users,
-      title: 'Compassionate Support',
-      description: '24/7 empathetic AI companion ready to listen and help',
-      color: 'from-blue-500 to-cyan-500',
-    },
+    }, 
   ];
 
   return (

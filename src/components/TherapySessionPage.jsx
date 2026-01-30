@@ -17,18 +17,12 @@ class TTSQueue {
   }
 
   enqueue(text, fetchAudioFn) {
-  if (!text || !text.trim()) return;
-
-  // ✅ Prevent replay of same text
-  if (this.lastPlayed === text) return;
-
-  // ✅ Prevent duplicate queue entries
-  if (this.queue.some(item => item.text === text)) return;
-
-  this.queue.push({ text, fetchAudioFn });
-  this._run();
-}
-
+    if (!text || !text.trim()) return;
+    // dedupe identical consecutive texts
+    if (this.lastPlayed === text) return;
+    this.queue.push({ text, fetchAudioFn });
+    this._run();
+  }
 
   async _run() {
     if (this.running) return;
@@ -55,7 +49,7 @@ class TTSQueue {
         try {
           this.audioElement.pause();
           this.audioElement.currentTime = 0;
-        } catch (e) {}
+        } catch (e) { }
 
         // attempt to play; if blocked by browser, catch and continue
         try {
@@ -75,7 +69,7 @@ class TTSQueue {
           this.audioElement.addEventListener('ended', clean);
           // fallback in case audio 'ended' doesn't fire
           const timeoutHandle = setTimeout(() => {
-            try { this.audioElement.pause(); } catch (e) {}
+            try { this.audioElement.pause(); } catch (e) { }
             resolve();
           }, 60_000); // 60s safety cap
         });
@@ -88,7 +82,7 @@ class TTSQueue {
           // clear src so future revokes are clean
           this.audioElement.removeAttribute('src');
           this.audioElement.load();
-        } catch (e) {}
+        } catch (e) { }
       } catch (err) {
         console.error('TTS Queue item failed:', err);
       }
@@ -120,7 +114,7 @@ const fetchTTSAudioArrayBuffer = async (text) => {
 
 const TherapySessionPage = () => {
   const navigate = useNavigate();
-  const { user, addTherapySession, setSadDetectionCount } = useApp();
+  const { user, addTherapySession, setSadDetectionCount, currentEmotion } = useApp();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [sessionStartTime] = useState(new Date());
@@ -169,6 +163,7 @@ const TherapySessionPage = () => {
         body: JSON.stringify({
           userMessage,
           messageHistory: messageHistory.slice(-6),
+          emotion: currentEmotion?.emotion || 'neutral'
         }),
       });
       if (!response.ok) {
@@ -190,8 +185,8 @@ const TherapySessionPage = () => {
     }
 
     if (user && !welcomeMessageSent) {
-      const welcomeText =
-        "Hello myself PureSoul,Welcome to your therapy session. This is your safe space to talk about anything on your mind. I'm here to listen without any judgment.";
+      const emotion = currentEmotion?.emotion || 'neutral';
+      const welcomeText = `It seems you are feeling ${emotion}. Welcome to your therapy session. This is your safe space to talk about anything on your mind. I'm here to listen without any judgment.`;
 
       // protect against duplicate initial message if messages already contain same text
       const alreadyHasWelcome = messages.some(
@@ -219,41 +214,39 @@ const TherapySessionPage = () => {
   }, [messages]);
 
   const handleSendMessage = async () => {
-  if (!inputMessage.trim()) return;
+    if (!inputMessage.trim()) return;
 
-  const userMessage = {
-    id: Date.now().toString(),
-    text: inputMessage,
-    sender: 'user',
-    timestamp: new Date(),
+    const userMessage = {
+      id: Date.now().toString(),
+      text: inputMessage,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMessage]);
+    setInputMessage('');
+    setIsTyping(true);
+
+    // fetch therapist response
+    const therapeuticResponse = await getTherapeuticResponse(inputMessage, [...messages, userMessage]);
+
+    // 🔹 Preload audio while we prepare message
+    const audioBuffer = await fetchTTSAudioArrayBuffer(therapeuticResponse);
+
+    setIsTyping(false);
+
+    const therapistMessage = {
+      id: (Date.now() + 1).toString(),
+      text: therapeuticResponse,
+      sender: 'therapist',
+      timestamp: new Date(),
+    };
+
+    // 🔹 Append text message & play audio together
+    setMessages((prev) => [...prev, therapistMessage]);
+    if (audioBuffer) {
+      ttsQueueRef.current?.enqueue(therapistMessage.text, async () => audioBuffer);
+    }
   };
-  setMessages((prev) => [...prev, userMessage]);
-  setInputMessage('');
-  setIsTyping(true);
-
-  // fetch therapist response
-  const therapeuticResponse = await getTherapeuticResponse(inputMessage, [...messages, userMessage]);
-  
-  // 🔹 Preload audio while we prepare message
-  //const audioBuffer = await fetchTTSAudioArrayBuffer(therapeuticResponse);
-
-  setIsTyping(false);
-
-  const therapistMessage = {
-    id: (Date.now() + 1).toString(),
-    text: therapeuticResponse,
-    sender: 'therapist',
-    timestamp: new Date(),
-  };
-
-  // 🔹 Append text message & play audio together
-  setMessages((prev) => [...prev, therapistMessage]);
-  ttsQueueRef.current?.enqueue(
-  therapistMessage.text,
-  fetchTTSAudioArrayBuffer
-);
-
-};
 
 
   const handleEndSession = () => {
@@ -309,9 +302,8 @@ const TherapySessionPage = () => {
               onClick={toggleVoice}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className={`p-3 rounded-full transition-all duration-300 shadow-lg ${
-                isListening ? 'bg-red-500 text-white shadow-red-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
+              className={`p-3 rounded-full transition-all duration-300 shadow-lg ${isListening ? 'bg-red-500 text-white shadow-red-200' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                }`}
             >
               {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             </motion.button>
@@ -364,9 +356,8 @@ const TherapySessionPage = () => {
                     )}
 
                     <div
-                      className={`px-6 py-4 rounded-2xl shadow-lg ${
-                        message.sender === 'user' ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' : 'bg-gray-50 text-gray-800 border border-gray-200'
-                      }`}
+                      className={`px-6 py-4 rounded-2xl shadow-lg ${message.sender === 'user' ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' : 'bg-gray-50 text-gray-800 border border-gray-200'
+                        }`}
                     >
                       <p className="text-sm leading-relaxed">{message.text}</p>
                       <p className={`text-xs mt-3 ${message.sender === 'user' ? 'text-purple-100' : 'text-gray-500'}`}>
