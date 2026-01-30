@@ -16,7 +16,9 @@ function App() {
     <AppProvider>
       <Router>
         <Header />
-        <Routes>
+        <div className="pt-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Routes>
           <Route path="/" element={<IntroPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/welcome" element={<WelcomePage />} />
@@ -26,7 +28,9 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/therapyselection" element={<TherapistSelectionPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            </Routes>
+          </div>
+        </div>
       </Router>
     </AppProvider>
   );

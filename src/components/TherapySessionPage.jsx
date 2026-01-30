@@ -133,6 +133,7 @@ const TherapySessionPage = () => {
   // audio element & queue refs
   const audioElRef = useRef(null);
   const ttsQueueRef = useRef(null);
+  const [ttsReady, setTtsReady] = useState(false);
   const playedInitialRef = useRef(false);
 
   // initialize audio element and queue once
@@ -151,6 +152,9 @@ const TherapySessionPage = () => {
 
     if (!ttsQueueRef.current && audioElRef.current) {
       ttsQueueRef.current = new TTSQueue(audioElRef.current);
+      setTtsReady(true);
+    } else if (ttsQueueRef.current) {
+      setTtsReady(true);
     }
   }, []);
 
@@ -191,16 +195,14 @@ const TherapySessionPage = () => {
       return;
     }
 
-    if (user && !welcomeMessageSent) {
+    // wait until TTS queue is ready before attempting to enqueue/play welcome audio
+    if (user && !welcomeMessageSent && ttsReady) {
       const emotion = currentEmotion?.emotion || 'neutral';
-      // Short, friendly welcome — keep it brief
       const welcomeText = `${specialtyName} — I notice you're feeling ${emotion}. I'm here to listen. Want to share what's on your mind?`;
 
-      // If there are already messages, play the latest instead of inserting welcome again
       if (messages.length > 0) {
         const latest = messages[messages.length - 1];
         if (latest && !playedInitialRef.current) {
-          // enqueue latest message audio if available and not already played
           const textToPlay = latest.text;
           if (ttsQueueRef.current && ttsQueueRef.current.lastPlayed !== textToPlay) {
             ttsQueueRef.current.enqueue(textToPlay, fetchTTSAudioArrayBuffer);
@@ -216,7 +218,6 @@ const TherapySessionPage = () => {
             timestamp: new Date(),
           };
           setMessages([initialMessage]);
-          // enqueue TTS (queue will fetch and play when possible) — guard against duplicate plays
           if (ttsQueueRef.current && ttsQueueRef.current.lastPlayed !== initialMessage.text) {
             ttsQueueRef.current.enqueue(initialMessage.text, fetchTTSAudioArrayBuffer);
           }
@@ -225,9 +226,8 @@ const TherapySessionPage = () => {
       }
       setWelcomeMessageSent(true);
     }
-    // intentionally exclude messages from deps so it doesn't retrigger on message changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, navigate, welcomeMessageSent]);
+  }, [user, navigate, welcomeMessageSent, ttsReady]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
