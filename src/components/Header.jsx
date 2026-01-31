@@ -3,12 +3,16 @@ import { motion } from 'framer-motion';
 import { LogOut, User, Menu } from 'lucide-react';
 import specialties from '../utils/specialties.js';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext.jsx';
 
 const Header = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useApp();
+
+  // Pages where header should be transparent/blended
+  const isTransparent = ['/therapy-session', '/emotion-detection'].includes(location.pathname);
 
   const handleLogout = () => {
     logout();
@@ -23,7 +27,10 @@ const Header = () => {
   };
 
   return (
-    <header className="w-full sticky top-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-100">
+    <header className={`w-full z-40 transition-all duration-300 ${isTransparent
+      ? 'sticky top-0 bg-white/50 backdrop-blur-sm border-b border-transparent'
+      : 'sticky top-0 bg-white/50 backdrop-blur-sm border-b border-gray-100'
+      }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="h-16 flex items-center justify-between">
           <div className="flex items-center space-x-3">

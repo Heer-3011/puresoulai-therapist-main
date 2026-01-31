@@ -98,7 +98,103 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema, 'usertable');
 
-// --- 5. DEFINE ALL API ENDPOINTS ---
+const emotionHistorySchema = new mongoose.Schema({
+  userid: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  emotion: { type: String, required: true },
+  confidence: { type: Number },
+  timestamp: { type: Date, default: Date.now },
+}, { timestamps: false });
+
+const EmotionHistory = mongoose.model('EmotionHistory', emotionHistorySchema, 'emotion_history');
+
+const therapySessionSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  date: { type: Date, default: Date.now },
+  duration: { type: Number }, // in minutes
+  detectedEmotion: { type: String },
+  specialty: { type: String },
+  messages: [{
+    sender: String,
+    text: String,
+    timestamp: Date
+  }]
+}, { timestamps: true });
+
+const TherapySession = mongoose.model('TherapySession', therapySessionSchema, 'therapy_session');
+
+// Middleware to verify JWT token
+const auth = (req, res, next) => {
+  const token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ message: "Access denied" });
+
+  try {
+    const verified = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = verified;
+    next();
+  } catch (err) {
+    res.status(400).json({ message: "Invalid token" });
+  }
+};
+
+// GET EMOTION HISTORY
+app.get('/api/emotion-history', auth, async (req, res) => {
+  try {
+    const history = await EmotionHistory.find({ userid: req.user.id }).sort({ timestamp: -1 });
+    res.json(history);
+  } catch (err) {
+    console.error('Error fetching emotion history:', err);
+    res.status(500).json({ message: "Error fetching emotion history" });
+  }
+});
+
+// SAVE EMOTION DETECTION
+app.post('/api/emotion-history', auth, async (req, res) => {
+  try {
+    const { emotion, confidence, timestamp } = req.body;
+    const newEntry = new EmotionHistory({
+      userid: req.user.id,
+      emotion,
+      confidence,
+      timestamp: timestamp || new Date()
+    });
+    const saved = await newEntry.save();
+    res.json(saved);
+  } catch (err) {
+    console.error('Error saving emotion:', err);
+    res.status(500).json({ message: "Error saving emotion" });
+  }
+});
+
+// GET THERAPY SESSIONS
+app.get('/api/therapy-sessions', auth, async (req, res) => {
+  try {
+    const sessions = await TherapySession.find({ userId: req.user.id }).sort({ date: -1 });
+    res.json(sessions);
+  } catch (err) {
+    console.error('Error fetching therapy sessions:', err);
+    res.status(500).json({ message: "Error fetching therapy sessions" });
+  }
+});
+
+// SAVE THERAPY SESSION
+app.post('/api/therapy-sessions', auth, async (req, res) => {
+  try {
+    const { date, duration, messages, detectedEmotion, specialty } = req.body;
+    const newSession = new TherapySession({
+      userId: req.user.id,
+      date: date || new Date(),
+      duration,
+      messages,
+      detectedEmotion: detectedEmotion || 'neutral',
+      specialty
+    });
+    const saved = await newSession.save();
+    res.json(saved);
+  } catch (err) {
+    console.error('Error saving therapy session:', err);
+    res.status(500).json({ message: "Error saving therapy session" });
+  }
+});
 
 // CHATBOT RESPONSE ENDPOINT
 app.post('/api/get-response', async (req, res) => {
@@ -159,41 +255,7 @@ app.post('/api/get-response', async (req, res) => {
   }
 });
 
-// TEXT TO SPEECH ENDPOINT
-app.post('/api/text-to-speech', async (req, res) => {
-  try {
-    const { text } = req.body;
-    if (!text) return res.status(400).json({ error: "Text is required" });
 
-    const cleanedText = text
-      .replace(/\*.*?\*/g, '')
-      .replace(/[\u{1F600}-\u{1F64F}]/gu, '');
-
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM/stream`,
-      {
-        method: "POST",
-        headers: {
-          "xi-api-key": process.env.ELEVENLABS_API_KEY,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          text: cleanedText,
-          model_id: "eleven_multilingual_v2"
-        })
-      }
-    );
-
-    if (!response.ok) throw new Error(await response.text());
-
-    res.setHeader("Content-Type", "audio/mpeg");
-    response.body.pipe(res);
-
-  } catch (error) {
-    console.error("ElevenLabs error:", error);
-    res.status(500).json({ error: "Speech generation failed" });
-  }
-});
 
 // REGISTER
 app.post('/api/register', async (req, res) => {

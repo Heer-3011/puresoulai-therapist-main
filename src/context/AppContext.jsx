@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const AppContext = createContext(undefined);
 
@@ -12,7 +12,6 @@ export const useApp = () => {
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    // Load persisted user (stored at login) to survive page reloads.
     try {
       const stored = localStorage.getItem('authUser');
       if (stored) return JSON.parse(stored);
@@ -22,27 +21,103 @@ export const AppProvider = ({ children }) => {
     }
     return null;
   });
+
   const [currentEmotion, setCurrentEmotion] = useState(null);
   const [emotionHistory, setEmotionHistory] = useState([]);
   const [therapySessions, setTherapySessions] = useState([]);
   const [sadDetectionCount, setSadDetectionCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const addEmotionData = (emotion) => {
-    setEmotionHistory(prev => [...prev, emotion]);
+  const fetchHistory = useCallback(async () => {
+    const token = localStorage.getItem('authToken');
+    if (!token || !user) return;
+
+    setIsLoading(true);
+    try {
+      const [emotionsRes, sessionsRes] = await Promise.all([
+        fetch('http://localhost:3001/api/emotion-history', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('http://localhost:3001/api/therapy-sessions', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+
+      if (emotionsRes.ok) {
+        const emotions = await emotionsRes.json();
+        setEmotionHistory(emotions);
+      }
+      if (sessionsRes.ok) {
+        const sessions = await sessionsRes.json();
+        setTherapySessions(sessions);
+      }
+    } catch (err) {
+      console.error('Error fetching history:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchHistory();
+    } else {
+      setEmotionHistory([]);
+      setTherapySessions([]);
+      setIsLoading(false);
+    }
+  }, [user, fetchHistory]);
+
+  const addEmotionData = async (emotionData) => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    try {
+      const res = await fetch('http://localhost:3001/api/emotion-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(emotionData)
+      });
+      if (res.ok) {
+        const newEntry = await res.json();
+        setEmotionHistory(prev => [newEntry, ...prev]);
+      }
+    } catch (err) {
+      console.error('Error saving emotion:', err);
+    }
   };
 
-  const addTherapySession = (session) => {
-    setTherapySessions(prev => [...prev, session]);
+  const addTherapySession = async (session) => {
+    const token = localStorage.getItem('authToken');
+    if (!token) return;
+
+    try {
+      const res = await fetch('http://localhost:3001/api/therapy-sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(session)
+      });
+      if (res.ok) {
+        const newSession = await res.json();
+        setTherapySessions(prev => [newSession, ...prev]);
+      }
+    } catch (err) {
+      console.error('Error saving session:', err);
+    }
   };
-  
+
   const logout = () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
     setUser(null);
   };
 
-  // Debug user state
-  console.log('AppContext user state:', user ? { id: user.id, username: user.username } : 'null');
   return (
     <AppContext.Provider
       value={{
@@ -57,6 +132,8 @@ export const AppProvider = ({ children }) => {
         addTherapySession,
         sadDetectionCount,
         setSadDetectionCount,
+        isLoading,
+        refreshHistory: fetchHistory
       }}
     >
       {children}

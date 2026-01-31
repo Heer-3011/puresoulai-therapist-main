@@ -16,18 +16,18 @@ function App() {
     <AppProvider>
       <Router>
         <Header />
-        <div className="pt-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="">
+          <div className="max-w-full mx-auto">
             <Routes>
-          <Route path="/" element={<IntroPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/welcome" element={<WelcomePage />} />
-          <Route path="/emotion-detection" element={<EmotionDetectionPage />} />
-          <Route path="/therapy-session" element={<TherapySessionPage />} />
-          <Route path="/mood-history" element={<MoodHistoryPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/therapyselection" element={<TherapistSelectionPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+              <Route path="/" element={<IntroPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/welcome" element={<WelcomePage />} />
+              <Route path="/emotion-detection" element={<EmotionDetectionPage />} />
+              <Route path="/therapy-session" element={<TherapySessionPage />} />
+              <Route path="/mood-history" element={<MoodHistoryPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/therapyselection" element={<TherapistSelectionPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
         </div>

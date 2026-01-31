@@ -10,9 +10,9 @@ import MediaPipeEmotionDetector from '../utils/mediapipeDetection.js';
 const EmotionDetectionPage = () => {
   const navigate = useNavigate();
   const { user, setCurrentEmotion, addEmotionData } = useApp();
-  
+
   // State for the batching and popup logic
-  
+
   const [emotionReadings, setEmotionReadings] = useState([]);
   const [dominantEmotion, setDominantEmotion] = useState(null);
   const [showEmotionPopup, setShowEmotionPopup] = useState(false);
@@ -28,7 +28,7 @@ const EmotionDetectionPage = () => {
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [modelReady, setModelReady] = useState(false);
   const [detectionError, setDetectionError] = useState(null);
-  
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const emotionDetectorRef = useRef(null);
@@ -74,8 +74,8 @@ const EmotionDetectionPage = () => {
 
   const requestCameraPermission = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } 
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
       });
       setStream(mediaStream);
       setHasPermission(true);
@@ -99,6 +99,13 @@ const EmotionDetectionPage = () => {
     if (!readings.length) return;
     const emotionCounts = readings.reduce((acc, emotion) => ({ ...acc, [emotion]: (acc[emotion] || 0) + 1 }), {});
     const dominant = Object.keys(emotionCounts).reduce((a, b) => emotionCounts[a] > emotionCounts[b] ? a : b);
+
+    // Save the dominant emotion to the database
+    addEmotionData({
+      emotion: dominant,
+      confidence: emotionCounts[dominant] / readings.length
+    });
+
     setDominantEmotion(dominant);
     setShowEmotionPopup(true);
   };
@@ -115,7 +122,8 @@ const EmotionDetectionPage = () => {
         };
         setCurrentEmotionState(emotionData);
         setCurrentEmotion(emotionData);
-        addEmotionData(emotionData);
+        // We removed direct addEmotionData call here to avoid spamming the DB
+        // It will be saved in analyzeReadings after a batch is complete
         setDetectionHistory(prev => [emotionData, ...prev.slice(0, 4)]);
         setEmotionReadings(prev => {
           const newReadings = [...prev, result.emotion];
@@ -154,7 +162,7 @@ const EmotionDetectionPage = () => {
     setDominantEmotion(null);
     setIsDetecting(true);
   };
-  
+
   const handleCloseTips = () => {
     setShowCalmingTips(false);
     setIsDetecting(true);
@@ -178,19 +186,19 @@ const EmotionDetectionPage = () => {
     if (hasPermission && modelReady && !isDetecting && !showEmotionPopup && !showCalmingTips) {
       setIsDetecting(true);
     }
-    
+
     // Manage the interval timer
     if (isDetecting) {
       detectionIntervalRef.current = setInterval(performEmotionDetection, 1000);
     } else {
       if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
     }
-    
+
     return () => {
       if (detectionIntervalRef.current) clearInterval(detectionIntervalRef.current);
     };
   }, [isDetecting, hasPermission, modelReady, showEmotionPopup, showCalmingTips]);
-  
+
   const EmotionIconComponent = currentEmotionState ? emotionDataMap[currentEmotionState.emotion].component : Camera;
 
   return (
@@ -198,13 +206,13 @@ const EmotionDetectionPage = () => {
       <div className="absolute inset-0">
         {[...Array(10)].map((_, i) => (
           <motion.div key={i} className="absolute rounded-full bg-gradient-to-r from-purple-500/10 to-cyan-500/10 blur-xl"
-            style={{ width: `${Math.random()*200+100}px`, height: `${Math.random()*200+100}px`, left: `${Math.random()*100}%`, top: `${Math.random()*100}%` }}
+            style={{ width: `${Math.random() * 200 + 100}px`, height: `${Math.random() * 200 + 100}px`, left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
             animate={{ x: [0, 30, -30, 0], y: [0, -30, 30, 0], scale: [1, 1.2, 0.8, 1] }}
-            transition={{ duration: Math.random()*10+10, repeat: Infinity, ease: 'easeInOut' }}
+            transition={{ duration: Math.random() * 10 + 10, repeat: Infinity, ease: 'easeInOut' }}
           />
         ))}
       </div>
-      
+
       <AnimatePresence>
         {showEmotionPopup && dominantEmotion && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
@@ -223,7 +231,7 @@ const EmotionDetectionPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      
+
       <main className="relative z-10">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto mb-8">
           <div className="flex justify-between items-center mb-6">
@@ -233,9 +241,9 @@ const EmotionDetectionPage = () => {
               <button onClick={() => navigate('/mood-history')} className="flex items-center px-4 py-2 bg-white/10 backdrop-blur-sm rounded-full text-purple-300 hover:text-white hover:bg-white/20 transition-all duration-300 border border-white/20"><Navigation className="w-5 h-5 mr-2" /> History</button>
             </div>
           </div>
-          
-          {hasPermission === false && ( <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-2xl p-4 mb-6"> <div className="flex items-center space-x-3"> <CameraOff className="w-5 h-5 text-red-400" /> <p className="text-red-200">Camera access is required. Please allow camera permission and try again.</p> </div> </motion.div> )}
-          {detectionError && ( <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-2xl p-4 mb-6"> <div className="flex items-center space-x-3"> <AlertCircle className="w-5 h-5 text-red-400" /> <p className="text-red-200">{detectionError}</p> </div> </motion.div> )}
+
+          {hasPermission === false && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-2xl p-4 mb-6"> <div className="flex items-center space-x-3"> <CameraOff className="w-5 h-5 text-red-400" /> <p className="text-red-200">Camera access is required. Please allow camera permission and try again.</p> </div> </motion.div>)}
+          {detectionError && (<motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="bg-red-500/20 backdrop-blur-sm border border-red-400/30 rounded-2xl p-4 mb-6"> <div className="flex items-center space-x-3"> <AlertCircle className="w-5 h-5 text-red-400" /> <p className="text-red-200">{detectionError}</p> </div> </motion.div>)}
         </motion.div>
 
         <div className="w-full flex flex-col items-center gap-8">
@@ -248,14 +256,14 @@ const EmotionDetectionPage = () => {
                     <>
                       <video ref={videoRef} className="w-full h-full object-cover rounded-2xl" autoPlay muted playsInline />
                       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-                      {isDetecting && ( <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute top-4 left-4 bg-green-500/80 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm font-medium"> 🔴 Detecting... </motion.div> )}
+                      {isDetecting && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute top-4 left-4 bg-green-500/80 backdrop-blur-sm text-white px-3 py-1 rounded-full text-sm font-medium"> 🔴 Detecting... </motion.div>)}
                     </>
-                  ) : ( <div className="flex items-center justify-center h-full text-gray-500"> {hasPermission === null && !isModelLoading && (<Camera className="w-16 h-16 animate-pulse" />)} {isModelLoading && (<Brain className="w-16 h-16 animate-spin" />)} {hasPermission === false && (<div className="text-center"> <CameraOff className="w-16 h-16 mx-auto mb-4" /> <p className="text-sm">Camera access denied</p> </div>)} </div> )}
+                  ) : (<div className="flex items-center justify-center h-full text-gray-500"> {hasPermission === null && !isModelLoading && (<Camera className="w-16 h-16 animate-pulse" />)} {isModelLoading && (<Brain className="w-16 h-16 animate-spin" />)} {hasPermission === false && (<div className="text-center"> <CameraOff className="w-16 h-16 mx-auto mb-4" /> <p className="text-sm">Camera access denied</p> </div>)} </div>)}
                 </div>
               </div>
             </div>
           </motion.div>
-          
+
           <div className="w-full max-w-3xl grid md:grid-cols-2 gap-8">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
               <div className="group bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl border border-white/20 hover:border-white/30 transition-all duration-500 h-full relative">
@@ -285,7 +293,7 @@ const EmotionDetectionPage = () => {
                 </div>
               </div>
             </motion.div>
-            
+
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
               <div className="group bg-white/10 backdrop-blur-lg rounded-3xl p-6 shadow-2xl border border-white/20 hover:border-white/30 transition-all duration-500 h-full relative">
                 <h3 className="text-lg font-semibold text-white mb-4 relative z-10">Recent Detections</h3>
